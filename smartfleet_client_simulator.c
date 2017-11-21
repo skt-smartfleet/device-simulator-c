@@ -94,6 +94,9 @@ void onConnect(void* context, MQTTAsync_successData* response)
 
 	deliveredtoken = 0;
 
+	//////////////////////////////////////////////////
+	// Subscribe the Topic for RPC
+	//////////////////////////////////////////////////
 	if ((rc = MQTTAsync_subscribe(client, RPC_REQ_TOPIC, QOS, &opts)) != MQTTASYNC_SUCCESS)
 	{
 		printf("Failed to start subscribe, return code %d\n", rc);
@@ -102,9 +105,9 @@ void onConnect(void* context, MQTTAsync_successData* response)
 
     opts.onSuccess = onSend;
 
-
-    /* Publish a microtrip message */
-
+    //////////////////////////////////////////////////
+	// Publish MicroTrip Message
+	//////////////////////////////////////////////////
     pubmsg.payload = MICROTRIP_PAYLOAD;
     pubmsg.payloadlen = strlen(MICROTRIP_PAYLOAD);
     pubmsg.qos = 0;
@@ -120,8 +123,9 @@ void onConnect(void* context, MQTTAsync_successData* response)
             MICROTRIP_PAYLOAD, SENDING_TOPIC);
     }
 
-    /* Publish a trip message */
-    
+    //////////////////////////////////////////////////
+	// Publish Trip Message
+	//////////////////////////////////////////////////
     pubmsg.payload = TRIP_PAYLOAD;
     pubmsg.payloadlen = strlen(TRIP_PAYLOAD);
     pubmsg.qos = 1;
@@ -138,6 +142,9 @@ void onConnect(void* context, MQTTAsync_successData* response)
 }
 
 
+//////////////////////////////////////////////////
+// Callback function for Subscribed RPC Message.
+//////////////////////////////////////////////////
 int msgarrvd(void *context, char *topicName, int topicLen, MQTTAsync_message *message)
 {
     int i;
@@ -170,11 +177,13 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTAsync_message *me
     opts.onSuccess = onSend;
     opts.context = client;
 
+    // RPC Message에 대한 Acknowledgement를 Publish하는 payload 생성
     pubmsg.payload = RPC_RESP_PAYLOAD;
     pubmsg.payloadlen = strlen(RPC_RESP_PAYLOAD);
     pubmsg.qos = 1;
     pubmsg.retained = 0;
 
+    // RPC Message에 대해 Acknowledgement를 publish
     if ((rc = MQTTAsync_sendMessage(client, topic, &pubmsg, &opts)) != MQTTASYNC_SUCCESS)
 	{
 		printf("Failed to start sendMessage, return code %d\n", rc);
@@ -198,6 +207,9 @@ int main(int argc, char* argv[])
 	int rc;
 	int ch;
 
+	/////////////////////////////////////////////////////////////////
+	// Create MQTT Async Client
+	/////////////////////////////////////////////////////////////////
 	MQTTAsync_create(&client, ADDRESS, CLIENTID, MQTTCLIENT_PERSISTENCE_NONE, NULL);
 
 	MQTTAsync_setCallbacks(client, client, connlost, msgarrvd, NULL);
@@ -212,12 +224,18 @@ int main(int argc, char* argv[])
     ssl_opts.enableServerCertAuth = 1;
     conn_opts.ssl = &ssl_opts;
 
+    /////////////////////////////////////////////////////////////////
+	// Request Connection Asynchronously
+	/////////////////////////////////////////////////////////////////
 	if ((rc = MQTTAsync_connect(client, &conn_opts)) != MQTTASYNC_SUCCESS)
 	{
 		printf("Failed to start connect, return code %d\n", rc);
 		exit(EXIT_FAILURE);
 	}
 
+	/////////////////////////////////////////////////////////////////
+	// Wait until subscribed
+	/////////////////////////////////////////////////////////////////
 	while	(!subscribed)
 		#if defined(WIN32)
 			Sleep(100);
@@ -228,11 +246,14 @@ int main(int argc, char* argv[])
 	if (finished)
 		goto exit;
 
-	do 
+	do
 	{
 		ch = getchar();
 	} while (ch!='Q' && ch != 'q');
 
+	/////////////////////////////////////////////////////////////////
+	// Disconnect MQTT Async Client
+	/////////////////////////////////////////////////////////////////
 	disc_opts.onSuccess = onDisconnect;
 	if ((rc = MQTTAsync_disconnect(client, &disc_opts)) != MQTTASYNC_SUCCESS)
 	{
@@ -247,6 +268,9 @@ int main(int argc, char* argv[])
 		#endif
 
 exit:
+	/////////////////////////////////////////////////////////////////
+	// Destroy MQTT Async Client
+	/////////////////////////////////////////////////////////////////
 	MQTTAsync_destroy(&client);
  	return rc;
 }
